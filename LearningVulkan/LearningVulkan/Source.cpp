@@ -63,6 +63,7 @@ private:
 		PickPhysicalDevice();
 		CreateLogicalDevice();
 		CreateSwapChain();
+		CreateImageViews();
 	}
 
 	void CreateInstance() {
@@ -356,6 +357,35 @@ private:
 		}
 	}
 
+	void CreateImageViews() {
+		_swapchainImageViews.resize(_swapchainImages.size());
+
+		for (size_t i = 0; i < _swapchainImageViews.size(); i++) {
+			VkImageViewCreateInfo createInfo{};
+			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			createInfo.image = _swapchainImages[i];
+
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			createInfo.format = _swapchainImageFormat;
+
+			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			createInfo.subresourceRange.baseMipLevel = 0;
+			createInfo.subresourceRange.levelCount = 1;
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+
+			if (vkCreateImageView(_device, &createInfo, nullptr, &_swapchainImageViews[i]) != VK_SUCCESS) {
+				throw std::runtime_error("Failed to create image views!");
+			}
+
+		}
+	}
+
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 		uint32_t extensionCount;
 		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -525,6 +555,10 @@ private:
 			DestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
 		}
 
+		for (auto imageView : _swapchainImageViews) {
+			vkDestroyImageView(_device, imageView, nullptr);
+		}
+
 		vkDestroySwapchainKHR(_device, _swapChain, nullptr);
 
 		vkDestroyDevice(_device, nullptr);
@@ -555,6 +589,10 @@ private:
 	VkSurfaceKHR _surface;
 
 	VkSwapchainKHR _swapChain;
+
+	VkFormat _swapchainImageFormat;
+	std::vector<VkImageView> _swapchainImageViews;
+	std::vector<VkImage> _swapchainImages;
 };
 
 int main() {
