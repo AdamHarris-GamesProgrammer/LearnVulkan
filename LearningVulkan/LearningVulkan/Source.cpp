@@ -52,6 +52,7 @@ private:
 		CreateInstance();
 		SetupDebugMessenger();
 		PickPhysicalDevice();
+		CreateLogicalDevice();
 	}
 
 	void CreateInstance() {
@@ -272,6 +273,45 @@ private:
 		return indices;
 	}
 
+	void CreateLogicalDevice() {
+		QueueFamilyIndices indices = FindQueueFamilies(_physicalDevice);
+
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		VkPhysicalDeviceFeatures deviceFeatures{};
+		
+
+		VkDeviceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+
+		createInfo.pEnabledFeatures = &deviceFeatures;
+
+		createInfo.enabledExtensionCount = 0;
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else {
+			createInfo.enabledLayerCount = 0;
+		}
+
+		//TODO: Causes  Emulation found unrecognized structure type in pProperties->pNext - this struct will be ignored error switch API_MAKE_VERSION to the non deprecated commands in CreateInstance()
+		if (vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS) 
+		{
+			throw std::runtime_error("Failed to Create Logical Device!");
+		}
+
+		vkGetDeviceQueue(_device, indices.graphicsFamily.value(), 0, &_graphicsQueue);
+	}
+
 	void InitWindow() {
 		glfwInit();
 
@@ -298,6 +338,8 @@ private:
 		if (enableValidationLayers) {
 			DestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
 		}
+
+		vkDestroyDevice(_device, nullptr);
 		
 		vkDestroyInstance(_instance, nullptr);
 
@@ -315,6 +357,9 @@ private:
 	VkDebugUtilsMessengerEXT _debugMessenger;
 
 	VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE; //Implicitely destroyed when the instance is destroyed
+	VkDevice _device;
+
+	VkQueue _graphicsQueue;
 };
 
 int main() {
