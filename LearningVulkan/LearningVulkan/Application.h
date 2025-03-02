@@ -46,6 +46,7 @@ private:
 	VkSurfaceFormatKHR ChooseSwapChainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 	VkExtent2D ChooseSwapExent(const VkSurfaceCapabilitiesKHR& capabilities);
+	bool ValidateInstanceExtensionSupport(const std::vector<const char*>& extensions);
 
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
@@ -70,55 +71,63 @@ private:
 	void DrawFrame();
 
 private:
+	//Application data
+	const char* m_pApplicationName;
+	int m_screenWidth;
+	int m_screenHeight;
+	//~Application data
+
 	//GLFW
-	GLFWwindow* _pWindow = nullptr;
+	GLFWwindow* m_pWindow = nullptr;
+	//~GLFW
 
 	//Vulkan
-	VkInstance _instance;
-	VkDebugUtilsMessengerEXT _debugMessenger;
+	VkInstance m_instance;
+	VkDebugUtilsMessengerEXT m_debugMessenger;
 
-	VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE; //Implicitely destroyed when the instance is destroyed
-	VkDevice _device;
+	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE; //Implicitely destroyed when the instance is destroyed
+	VkDevice m_device;
 
-	VkQueue _graphicsQueue;
-	VkQueue _presentQueue;
+	VkQueue m_graphicsQueue;
+	VkQueue m_presentQueue;
 
-	VkRenderPass _renderPass;
-	VkPipeline _graphicsPipeline;
-	VkPipelineLayout _pipelineLayout;
+	VkRenderPass m_renderPass;
+	VkPipeline m_graphicsPipeline;
+	VkPipelineLayout m_pipelineLayout;
 
-	VkSurfaceKHR _surface;
+	VkSurfaceKHR m_surface;
 
-	VkSwapchainKHR _swapChain;
-	VkExtent2D _swapchainExtents;
-	VkFormat _swapchainImageFormat;
-	std::vector<VkImageView> _swapchainImageViews;
-	std::vector<VkImage> _swapchainImages;
+	VkSwapchainKHR m_swapChain;
+	VkExtent2D m_swapchainExtents;
+	VkFormat m_swapchainImageFormat;
+	std::vector<VkImageView> m_swapchainImageViews;
+	std::vector<VkImage> m_swapchainImages;
 
-	std::vector<VkFramebuffer> _swapchainFramebuffers;
+	std::vector<VkFramebuffer> m_swapchainFramebuffers;
 
 	//Manages the memory that is used to store the buffers and command buffers allocated from them
-	VkCommandPool _commandPool;
+	VkCommandPool m_commandPool;
 
-	VkCommandBuffer _commandBuffer;
+	VkCommandBuffer m_commandBuffer;
 
-	VkSemaphore _imageAvailableSemaphore;
-	VkSemaphore _renderFinishedSemaphore;
-	VkFence _inFlightFence;
+	VkSemaphore m_imageAvailableSemaphore;
+	VkSemaphore m_renderFinishedSemaphore;
+	VkFence m_inFlightFence;
 
 #ifdef NDEBUG
-	const bool enableValidationLayers = false;
+	const bool m_bEnableValidationLayers = false;
 #else
-	const bool enableValidationLayers = true;
+	const bool m_bEnableValidationLayers = true;
 #endif
 
-	const std::vector<const char*> validationLayers = {
+	const std::vector<const char*> m_validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
 	};
 
-	const std::vector<const char*> deviceExtensions = {
+	const std::vector<const char*> m_deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
+	//~Vulkan
 
 
 };

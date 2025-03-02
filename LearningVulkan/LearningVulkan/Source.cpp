@@ -1,10 +1,7 @@
-#include <cstdlib>
-#include <iostream>
 #include <stdexcept>
 #include <vector>
 
 #include "Application.h"
-
 
 ///////////////////////////////////////////
 int main() {
@@ -15,7 +12,7 @@ int main() {
 		app.Run();
 	}
 	catch (const std::exception& e) {
-		std::cerr << e.what() << std::endl;
+		printf(e.what() + '\n');
 		return 1;
 	}
 
