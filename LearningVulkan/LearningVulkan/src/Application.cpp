@@ -1,5 +1,7 @@
 #include "Application.h"
 
+#include "Core/Renderer/VulkanValidationLayer.h"
+
 #include <iostream>
 #include <fstream>
 #include <map>
@@ -20,8 +22,8 @@ void Application::Init(const int width, const int height, const char* appName)
 	m_pWindow = glfwCreateWindow(m_screenWidth, m_screenHeight, m_pApplicationName, nullptr, nullptr); //Last paramater only relevant to OpenGL
 
 	//Initialize Vulkan objects
-	CreateInstance();
-	SetupDebugMessenger();
+	m_vulkanInstance.CreateInstance(m_pApplicationName);
+	//TODO: Seperate debug messenger from instance class? 
 	CreateSurface();
 	PickPhysicalDevice();
 	CreateLogicalDevice();
@@ -49,9 +51,7 @@ void Application::Run()
 ///////////////////////////////////////////
 void Application::Cleanup()
 {
-	if (m_bEnableValidationLayers) {
-		DestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
-	}
+	m_vulkanInstance.DestroyDebugMessenger();
 
 	for (auto fbs : m_swapchainFramebuffers) {
 		vkDestroyFramebuffer(m_device, fbs, nullptr);
@@ -75,34 +75,13 @@ void Application::Cleanup()
 
 	vkDestroyDevice(m_device, nullptr);
 
-	vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
+	vkDestroySurfaceKHR(m_vulkanInstance.GetInstanceObject(), m_surface, nullptr);
 
-	vkDestroyInstance(m_instance, nullptr);
+	m_vulkanInstance.DestroyInstance();
 
 	//Cleanup GLFW
 	glfwDestroyWindow(m_pWindow);
 	glfwTerminate();
-}
-
-///////////////////////////////////////////
-VkResult Application::CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
-{
-	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-	if (func != nullptr) {
-		return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-	}
-	else {
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-	}
-}
-
-///////////////////////////////////////////
-void Application::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
-{
-	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-	if (func != nullptr) {
-		func(instance, debugMessenger, pAllocator);
-	}
 }
 
 ///////////////////////////////////////////
@@ -124,96 +103,6 @@ std::vector<char> Application::ReadFile(const std::string& filename)
 	file.close();
 
 	return buffer;
-}
-
-///////////////////////////////////////////
-std::vector<const char*> Application::GetRequiredExtensions()
-{
-	uint32_t extensionCount = 0;
-	const char** glfwExtensions;
-	glfwExtensions = glfwGetRequiredInstanceExtensions(&extensionCount);
-
-	std::vector<const char*> extensions(glfwExtensions, glfwExtensions + extensionCount);
-
-	if (m_bEnableValidationLayers) { //Allows our debugging utils to be added when we are running a development build
-		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	}
-
-	return extensions;
-}
-
-///////////////////////////////////////////
-bool Application::CheckValidationLayerSupport()
-{
-	//Gets the amount of layers in our instance
-	uint32_t layerCount;
-	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-	//fills the available layers vector with the layer data
-	std::vector<VkLayerProperties> availableLayers(layerCount);
-	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-	for (const char* layerName : m_validationLayers) {
-		bool layerFound = false;
-
-		for (const auto& layerProperties : availableLayers) {
-			if (strcmp(layerName, layerProperties.layerName) == 0) {
-				layerFound = true;
-				break;
-			}
-		}
-
-		if (!layerFound) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-///////////////////////////////////////////
-static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT messageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData)
-{
-	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-		std::cerr << "Validation Layer: " << pCallbackData->pMessage << std::endl;
-	}
-
-	return VK_FALSE;
-}
-
-void Application::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
-{
-	createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-	//Specifies what severity of messages this callback will be notified about
-	createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	//Specifies what type of messages this callback will be notified about
-	createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	//Specifies the pointer to the debug callback
-	createInfo.pfnUserCallback = DebugCallback;
-	createInfo.pUserData = nullptr;
-}
-
-///////////////////////////////////////////
-void Application::OutputSupportedExtensions()
-{
-	//Finds all the extensions this system supports
-	uint32_t extensionCount = 0;
-	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
-	std::vector<VkExtensionProperties> extensions(extensionCount);
-	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-	std::cout << "Available Extensions" << std::endl;
-	for (const auto& extension : extensions) {
-		std::cout << "\t" << extension.extensionName << "\n";
-	}
 }
 
 ///////////////////////////////////////////
@@ -319,32 +208,6 @@ VkExtent2D Application::ChooseSwapExent(const VkSurfaceCapabilitiesKHR& capabili
 
 		return actualExtent;
 	}
-}
-
-bool Application::ValidateInstanceExtensionSupport(const std::vector<const char*>& extensions)
-{
-	bool bAllLayersSupported = true;
-
-	uint32_t extensionCount = 0;
-	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr); //Get our extension count
-	std::vector<VkExtensionProperties> supportedExtensions(extensionCount);
-	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, supportedExtensions.data()); //Fill our exentions vector
-	
-	for (const auto& extensionToQuery : extensions) {
-		bool bFound = false;
-		for (const auto& supportedExtention : supportedExtensions) {
-			if (strcmp(supportedExtention.extensionName, extensionToQuery) == 0 && !bFound) {
-				bFound = true;
-			}
-		}
-
-		if (!bFound) {
-			bAllLayersSupported = false;
-			std::cerr << "\tExtension " << extensionToQuery << " is not supported by instance\n";
-		}
-	}
-
-	return bAllLayersSupported;
 }
 
 ///////////////////////////////////////////
@@ -483,72 +346,10 @@ QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice device)
 	return indices;
 }
 
-
-///////////////////////////////////////////
-void Application::CreateInstance()
-{
-	if (m_bEnableValidationLayers && !CheckValidationLayerSupport()) {
-		throw std::runtime_error("Validation layers requested, but not available");
-	}
-
-	//We need to create these information structs to tell Vulkan information about our program. 
-	VkApplicationInfo appInfo{};
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = m_pApplicationName;
-	appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0); //variant, major, minor, patch
-	appInfo.pEngineName = "No Engine";
-	appInfo.engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_3;
-
-	VkInstanceCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	createInfo.pApplicationInfo = &appInfo;
-
-	auto extensions = GetRequiredExtensions();
-	if (!ValidateInstanceExtensionSupport(extensions)) {
-		std::cerr << "Required Extensions are not supported by instance!\n";
-	}
-
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-	createInfo.ppEnabledExtensionNames = extensions.data();
-
-	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-	if (m_bEnableValidationLayers) {
-		createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
-		createInfo.ppEnabledLayerNames = m_validationLayers.data();
-
-		PopulateDebugMessengerCreateInfo(debugCreateInfo);
-		createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
-	}
-	else {
-		createInfo.enabledLayerCount = 0;
-		createInfo.pNext = nullptr;
-	}
-
-	if (vkCreateInstance(&createInfo, nullptr, &m_instance) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create Vulkan Instance!");
-	}
-
-	OutputSupportedExtensions(); //TODO: Hide this behind a log graphics variable. (Also TODO: Make a command system)
-}
-
-///////////////////////////////////////////
-void Application::SetupDebugMessenger()
-{
-	if (!m_bEnableValidationLayers) return;
-
-	VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-	PopulateDebugMessengerCreateInfo(createInfo);
-
-	if (CreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to setup debug messenger!");
-	}
-}
-
 ///////////////////////////////////////////
 void Application::CreateSurface()
 {
-	if (glfwCreateWindowSurface(m_instance, m_pWindow, nullptr, &m_surface) != VK_SUCCESS) {
+	if (glfwCreateWindowSurface(m_vulkanInstance.GetInstanceObject(), m_pWindow, nullptr, &m_surface) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create window surface!");
 	}
 }
@@ -557,14 +358,14 @@ void Application::CreateSurface()
 void Application::PickPhysicalDevice()
 {
 	uint32_t deviceCount = 0;
-	vkEnumeratePhysicalDevices(m_instance, &deviceCount, nullptr);
+	vkEnumeratePhysicalDevices(m_vulkanInstance.GetInstanceObject(), &deviceCount, nullptr);
 
 	if (deviceCount == 0) {
 		throw std::runtime_error("Failed to find GPUs with Vulkan support");
 	}
 
 	std::vector<VkPhysicalDevice> devices(deviceCount);
-	vkEnumeratePhysicalDevices(m_instance, &deviceCount, devices.data());
+	vkEnumeratePhysicalDevices(m_vulkanInstance.GetInstanceObject(), &deviceCount, devices.data());
 
 	std::multimap<int, VkPhysicalDevice> candidates;
 	for (const auto& device : devices) {
@@ -611,9 +412,9 @@ void Application::CreateLogicalDevice()
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(m_deviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = m_deviceExtensions.data();
 
-	if (m_bEnableValidationLayers) {
-		createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
-		createInfo.ppEnabledLayerNames = m_validationLayers.data();
+	if (VulkanValidationLayer::IsValidationLayerEnabled()) {
+		createInfo.enabledLayerCount = static_cast<uint32_t>(VulkanValidationLayer::GetValidationLayers().size());
+		createInfo.ppEnabledLayerNames = VulkanValidationLayer::GetValidationLayers().data();
 	}
 	else {
 		createInfo.enabledLayerCount = 0;

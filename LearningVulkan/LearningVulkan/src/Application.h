@@ -1,7 +1,9 @@
 #pragma once
 #define GLFW_INCLUDE_VULKAN
-
 #include <GLFW/glfw3.h>
+#undef GLFW_INCLUDE_VULKAN
+
+#include "Core/Renderer/VulkanInstance.h"
 
 #include <vector>
 #include <string>
@@ -34,19 +36,12 @@ public:
 
 private:
 	//Helpers
-	VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
-	void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
 	static std::vector<char> ReadFile(const std::string& filename);
-	std::vector<const char*> GetRequiredExtensions();
-	bool CheckValidationLayerSupport();
-	void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
-	void OutputSupportedExtensions();
 	int RateDeviceSuitability(VkPhysicalDevice device);
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 	VkSurfaceFormatKHR ChooseSwapChainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 	VkExtent2D ChooseSwapExent(const VkSurfaceCapabilitiesKHR& capabilities);
-	bool ValidateInstanceExtensionSupport(const std::vector<const char*>& extensions);
 
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
@@ -54,8 +49,6 @@ private:
 	QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 
 	//VK Objects
-	void CreateInstance();
-	void SetupDebugMessenger();
 	void CreateSurface();
 	void PickPhysicalDevice();
 	void CreateLogicalDevice();
@@ -81,10 +74,11 @@ private:
 	GLFWwindow* m_pWindow = nullptr;
 	//~GLFW
 
-	//Vulkan
-	VkInstance m_instance;
-	VkDebugUtilsMessengerEXT m_debugMessenger;
+	//Abstracted Vulkan
+	VulkanInstance m_vulkanInstance;
+	//~Abstracted Vulkan
 
+	//Raw Vulkan
 	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE; //Implicitely destroyed when the instance is destroyed
 	VkDevice m_device;
 
@@ -113,16 +107,6 @@ private:
 	VkSemaphore m_imageAvailableSemaphore;
 	VkSemaphore m_renderFinishedSemaphore;
 	VkFence m_inFlightFence;
-
-#ifdef NDEBUG
-	const bool m_bEnableValidationLayers = false;
-#else
-	const bool m_bEnableValidationLayers = true;
-#endif
-
-	const std::vector<const char*> m_validationLayers = {
-		"VK_LAYER_KHRONOS_validation"
-	};
 
 	const std::vector<const char*> m_deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
