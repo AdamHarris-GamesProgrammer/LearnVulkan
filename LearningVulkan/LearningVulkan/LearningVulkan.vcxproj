@@ -147,11 +147,13 @@
     <ClCompile Include="src\Source.cpp" />
     <ClCompile Include="src\Core\Renderer\VulkanInstance.cpp" />
     <ClCompile Include="src\Core\Renderer\VulkanValidationLayer.cpp" />
+    <ClCompile Include="src\Core\Renderer\VulkanDevice.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\Core\Renderer\VulkanInstance.h" />
     <ClInclude Include="src\Core\Renderer\VulkanValidationLayer.h" />
+    <ClInclude Include="src\Core\Renderer\VulkanDevice.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

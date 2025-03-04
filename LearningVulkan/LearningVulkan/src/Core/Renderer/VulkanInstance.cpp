@@ -11,6 +11,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData)
 {
+	//TODO: Implement a proper logging system here to allow for different levels of message severity
+
 	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
 		std::cerr << "Validation Layer: " << pCallbackData->pMessage << std::endl;
 	}
@@ -43,6 +45,10 @@ void VulkanInstance::CreateInstance(const char* pApplicationName)
 	createInfo.ppEnabledExtensionNames = extensions.data();
 
 	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+	if (VulkanValidationLayer::IsValidationLayerEnabled() && !ValidateValidationLayersSupport()) {
+		throw std::runtime_error("Validation layers requested, but not available");
+	}
+
 	if (VulkanValidationLayer::IsValidationLayerEnabled() && ValidateValidationLayersSupport()) {
 		createInfo.enabledLayerCount = static_cast<uint32_t>(VulkanValidationLayer::GetValidationLayers().size());
 		createInfo.ppEnabledLayerNames = VulkanValidationLayer::GetValidationLayers().data();
@@ -51,7 +57,7 @@ void VulkanInstance::CreateInstance(const char* pApplicationName)
 		debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 		//Specifies what severity of messages this callback will be notified about
 		debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
 		//Specifies what type of messages this callback will be notified about
 		debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
 			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;

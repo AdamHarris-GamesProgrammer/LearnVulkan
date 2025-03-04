@@ -4,26 +4,13 @@
 #undef GLFW_INCLUDE_VULKAN
 
 #include "Core/Renderer/VulkanInstance.h"
+#include "Core/Renderer/VulkanDevice.h"
 
 #include <vector>
 #include <string>
 #include <optional>
 
-struct SwapChainSupportDetails {
-	VkSurfaceCapabilitiesKHR capabilities;
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> presentModes;
-};
-
-struct QueueFamilyIndices {
-	std::optional<uint32_t> graphicsFamily;
-	std::optional<uint32_t> presentFamily;
-
-	bool IsComplete() {
-		return graphicsFamily.has_value() && presentFamily.has_value();
-	}
-};
-
+///////////////////////////////////////////
 class Application
 {
 public:
@@ -37,7 +24,6 @@ public:
 private:
 	//Helpers
 	static std::vector<char> ReadFile(const std::string& filename);
-	int RateDeviceSuitability(VkPhysicalDevice device);
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 	VkSurfaceFormatKHR ChooseSwapChainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
@@ -45,13 +31,9 @@ private:
 
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
-	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
-	QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 
 	//VK Objects
 	void CreateSurface();
-	void PickPhysicalDevice();
-	void CreateLogicalDevice();
 	void CreateSwapChain();
 	void CreateImageViews();
 	void CreateRenderPass();
@@ -76,15 +58,10 @@ private:
 
 	//Abstracted Vulkan
 	VulkanInstance m_vulkanInstance;
+	VulkanDevice m_vulkanDevices;
 	//~Abstracted Vulkan
 
 	//Raw Vulkan
-	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE; //Implicitely destroyed when the instance is destroyed
-	VkDevice m_device;
-
-	VkQueue m_graphicsQueue;
-	VkQueue m_presentQueue;
-
 	VkRenderPass m_renderPass;
 	VkPipeline m_graphicsPipeline;
 	VkPipelineLayout m_pipelineLayout;
@@ -112,7 +89,29 @@ private:
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 	//~Vulkan
-
-
 };
+
+/*
+* Logging System Notes
+* - For logging we need various levels of severity we will have these. Fatal, error, warning, info, debug, trace
+* - These will all take in a voradic argument allowing us to pass in a bunch of params.
+* - Vulkan validation layer debugging should be expanded to fully make use of this
+* - We should have different colours for each level of severity.
+* - We should be able to output our logs to a file.
+* - Timestamps of the logs would be useful.
+* - We should have some form of queue system so that when we have multiple threads trying to log we do not run into errors logging to a file
+* Assertion system
+* - We should have various forms of asserts for if something is a irredeemable assert or something we can note but ignore
+* - All runtime errors should be replaced with fatal asserts
+* - Asserts should breakpoint on the line that caused it.
+* 
+* General Vulkan Abstraction
+* - Swapchain class
+* - Framebuffer class
+* - Pipeline class
+* - Shader class
+* - Command buffer/pool class
+* - Cache the queue families for the physical device in VulkanDevice
+* 
+*/
 
