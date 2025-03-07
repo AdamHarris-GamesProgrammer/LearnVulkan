@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp" />
+    <ClCompile Include="src\Core\Renderer\VulkanSwapChain.cpp" />
     <ClCompile Include="src\Source.cpp" />
     <ClCompile Include="src\Core\Renderer\VulkanInstance.cpp" />
     <ClCompile Include="src\Core\Renderer\VulkanValidationLayer.cpp" />
@@ -152,6 +153,7 @@
   <ItemGroup>
     <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\Core\Renderer\VulkanInstance.h" />
+    <ClInclude Include="src\Core\Renderer\VulkanSwapChain.h" />
     <ClInclude Include="src\Core\Renderer\VulkanValidationLayer.h" />
     <ClInclude Include="src\Core\Renderer\VulkanDevice.h" />
   </ItemGroup>

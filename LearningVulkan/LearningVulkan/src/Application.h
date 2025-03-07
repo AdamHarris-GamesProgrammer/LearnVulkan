@@ -3,8 +3,9 @@
 #include <GLFW/glfw3.h>
 #undef GLFW_INCLUDE_VULKAN
 
-#include "Core/Renderer/VulkanInstance.h"
 #include "Core/Renderer/VulkanDevice.h"
+#include "Core/Renderer/VulkanInstance.h"
+#include "Core/Renderer/VulkanSwapChain.h"
 
 #include <vector>
 #include <string>
@@ -24,18 +25,12 @@ public:
 private:
 	//Helpers
 	static std::vector<char> ReadFile(const std::string& filename);
-	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
-	VkSurfaceFormatKHR ChooseSwapChainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-	VkExtent2D ChooseSwapExent(const VkSurfaceCapabilitiesKHR& capabilities);
 
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 
 	//VK Objects
 	void CreateSurface();
-	void CreateSwapChain();
-	void CreateImageViews();
 	void CreateRenderPass();
 	void CreateGraphicsPipeline();
 	void CreateFramebuffers();
@@ -59,6 +54,7 @@ private:
 	//Abstracted Vulkan
 	VulkanInstance m_vulkanInstance;
 	VulkanDevice m_vulkanDevices;
+	VulkanSwapChain m_vulkanSwapchain;
 	//~Abstracted Vulkan
 
 	//Raw Vulkan
@@ -67,12 +63,6 @@ private:
 	VkPipelineLayout m_pipelineLayout;
 
 	VkSurfaceKHR m_surface;
-
-	VkSwapchainKHR m_swapChain;
-	VkExtent2D m_swapchainExtents;
-	VkFormat m_swapchainImageFormat;
-	std::vector<VkImageView> m_swapchainImageViews;
-	std::vector<VkImage> m_swapchainImages;
 
 	std::vector<VkFramebuffer> m_swapchainFramebuffers;
 
@@ -84,10 +74,6 @@ private:
 	VkSemaphore m_imageAvailableSemaphore;
 	VkSemaphore m_renderFinishedSemaphore;
 	VkFence m_inFlightFence;
-
-	const std::vector<const char*> m_deviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
 	//~Vulkan
 };
 
@@ -106,12 +92,12 @@ private:
 * - Asserts should breakpoint on the line that caused it.
 * 
 * General Vulkan Abstraction
-* - Swapchain class
 * - Framebuffer class
 * - Pipeline class
 * - Shader class
 * - Command buffer/pool class
 * - Cache the queue families for the physical device in VulkanDevice
-* 
+* - Some form of global environment class with access to the renderer and general purpose things like the device.
+* - GLFW window class abstraction
 */
 
