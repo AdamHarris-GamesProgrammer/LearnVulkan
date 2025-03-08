@@ -5,6 +5,7 @@
 
 #include "Core/Renderer/VulkanDevice.h"
 #include "Core/Renderer/VulkanInstance.h"
+#include "Core/Renderer/VulkanShader.h"
 #include "Core/Renderer/VulkanSwapChain.h"
 
 #include <vector>
@@ -15,19 +16,12 @@
 class Application
 {
 public:
-
 	void Init(const int width, const int height, const char* appName);
-
 	void Run();
-
 	void Cleanup();
 
 private:
-	//Helpers
-	static std::vector<char> ReadFile(const std::string& filename);
-
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 
 	//VK Objects
 	void CreateSurface();
@@ -55,6 +49,8 @@ private:
 	VulkanInstance m_vulkanInstance;
 	VulkanDevice m_vulkanDevices;
 	VulkanSwapChain m_vulkanSwapchain;
+	VulkanShader m_vulkanVertexShader;
+	VulkanShader m_vulkanFragmentShader;
 	//~Abstracted Vulkan
 
 	//Raw Vulkan
@@ -68,7 +64,6 @@ private:
 
 	//Manages the memory that is used to store the buffers and command buffers allocated from them
 	VkCommandPool m_commandPool;
-
 	VkCommandBuffer m_commandBuffer;
 
 	VkSemaphore m_imageAvailableSemaphore;
@@ -99,5 +94,6 @@ private:
 * - Cache the queue families for the physical device in VulkanDevice
 * - Some form of global environment class with access to the renderer and general purpose things like the device.
 * - GLFW window class abstraction
+* - File IO readers and parsers
 */
 

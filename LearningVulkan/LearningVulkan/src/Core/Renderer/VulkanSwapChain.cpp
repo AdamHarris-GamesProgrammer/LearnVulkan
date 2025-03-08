@@ -68,6 +68,7 @@ void VulkanSwapChain::InitSwapChain(GLFWwindow* pWindow, VulkanDevice* pDevices,
 ///////////////////////////////////////////
 void VulkanSwapChain::CreateImageViews(VkDevice logicalDevice)
 {
+	//Create a image view for each image on our swap chain
 	m_swapchainImageViews.resize(m_swapchainImages.size());
 
 	for (size_t i = 0; i < m_swapchainImageViews.size(); i++) {
@@ -78,6 +79,7 @@ void VulkanSwapChain::CreateImageViews(VkDevice logicalDevice)
 		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		createInfo.format = m_swapchainImageFormat;
 
+		//This allows us to map colour channels to a specific channel
 		createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;

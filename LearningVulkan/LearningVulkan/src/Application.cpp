@@ -29,6 +29,8 @@ void Application::Init(const int width, const int height, const char* appName)
 	m_vulkanSwapchain.InitSwapChain(m_pWindow, &m_vulkanDevices, m_surface);
 	m_vulkanSwapchain.CreateImageViews(m_vulkanDevices.GetLogicalDevice());
 	CreateRenderPass();
+	m_vulkanVertexShader.InitShader("shaders/vert.spv", VK_SHADER_STAGE_VERTEX_BIT, m_vulkanDevices.GetLogicalDevice());
+	m_vulkanFragmentShader.InitShader("shaders/frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, m_vulkanDevices.GetLogicalDevice());
 	CreateGraphicsPipeline();
 	CreateFramebuffers();
 	CreateCommandPool();
@@ -71,6 +73,9 @@ void Application::Cleanup()
 
 	vkDestroyCommandPool(logicalDevice, m_commandPool, nullptr);
 
+	m_vulkanFragmentShader.DestroyShader(logicalDevice);
+	m_vulkanVertexShader.DestroyShader(logicalDevice);
+
 	m_vulkanDevices.DestroyDevice();
 
 	vkDestroySurfaceKHR(m_vulkanInstance.GetInstanceObject(), m_surface, nullptr);
@@ -80,27 +85,6 @@ void Application::Cleanup()
 	//Cleanup GLFW
 	glfwDestroyWindow(m_pWindow);
 	glfwTerminate();
-}
-
-///////////////////////////////////////////
-std::vector<char> Application::ReadFile(const std::string& filename)
-{
-	//std::ios::ate (start reading at end of file) std::ios::binary(read as a binary file and avoid text transformations)
-	std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-	if (!file.is_open()) {
-		throw std::runtime_error("Failed to open file: " + filename);
-	}
-
-	size_t fileSize = (size_t)file.tellg();
-	std::vector<char> buffer(fileSize);
-
-	file.seekg(0);
-	file.read(buffer.data(), fileSize);
-
-	file.close();
-
-	return buffer;
 }
 
 ///////////////////////////////////////////
@@ -165,22 +149,6 @@ void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
 }
 
 ///////////////////////////////////////////
-VkShaderModule Application::CreateShaderModule(const std::vector<char>& code)
-{
-	VkShaderModuleCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.codeSize = code.size();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-	VkShaderModule shaderModule;
-	if (vkCreateShaderModule(m_vulkanDevices.GetLogicalDevice(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create shader module!");
-	}
-
-	return shaderModule;
-}
-
-///////////////////////////////////////////
 void Application::CreateSurface()
 {
 	if (glfwCreateWindowSurface(m_vulkanInstance.GetInstanceObject(), m_pWindow, nullptr, &m_surface) != VK_SUCCESS) {
@@ -235,25 +203,7 @@ void Application::CreateRenderPass()
 ///////////////////////////////////////////
 void Application::CreateGraphicsPipeline()
 {
-	auto vertShaderCode = ReadFile("shaders/vert.spv");
-	auto fragShaderCode = ReadFile("shaders/frag.spv");
-
-	VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
-	VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
-
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageInfo.module = vertShaderModule;
-	vertShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageInfo.module = fragShaderModule;
-	fragShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+	VkPipelineShaderStageCreateInfo shaderStages[] = { m_vulkanVertexShader.GetShaderCreateInfo(), m_vulkanFragmentShader.GetShaderCreateInfo()};
 
 	std::vector<VkDynamicState> dynamicStates = {
 		VK_DYNAMIC_STATE_VIEWPORT,
@@ -374,9 +324,6 @@ void Application::CreateGraphicsPipeline()
 	if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create graphics pipeline!");
 	}
-
-	vkDestroyShaderModule(logicalDevice, vertShaderModule, nullptr);
-	vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
 }
 
 ///////////////////////////////////////////
