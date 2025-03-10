@@ -34,7 +34,7 @@ void Application::Init(const int width, const int height, const char* appName)
 	CreateGraphicsPipeline();
 	CreateFramebuffers();
 	CreateCommandPool();
-	CreateCommandBuffer();
+	CreateCommandBuffer(); //auto-destroyed when the pool is, we do not need to explicitely destroy the command buffers
 	CreateSyncObjects();
 }
 
@@ -46,6 +46,7 @@ void Application::Run()
 		DrawFrame();
 	}
 
+	//ensures we keep going until drawing and presentation operations are finished
 	vkDeviceWaitIdle(m_vulkanDevices.GetLogicalDevice());
 }
 
@@ -90,11 +91,13 @@ void Application::Cleanup()
 ///////////////////////////////////////////
 void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 {
+	//This function writes commands that we want to execute to the command buffer.
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = 0;
-	beginInfo.pInheritanceInfo = nullptr;
+	beginInfo.flags = 0; //optional. Either ONE_TIME_SUBMIT, RENDER_PASS_CONTINUE or SIMULTANEOUS_USE (cmd buffer will be rerecorded after execution, secondary cmd buffer that will be in one render pass, cmd buffer can be resubmitted)
+	beginInfo.pInheritanceInfo = nullptr; //optional (only relevent for secondary buffers)
 
+	//Begin our recording
 	if (vkBeginCommandBuffer(m_commandBuffer, &beginInfo) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to Record Command Buffer");
 	}
@@ -105,6 +108,7 @@ void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
 	//Define what attachements to bind
 	renderPassInfo.renderPass = m_renderPass;
 	renderPassInfo.framebuffer = m_swapchainFramebuffers[imageIndex];
+	//We need to bind the framebuffer for the swapchain that we want to draw to. 
 
 	//Define the size of the render pass area
 	VkExtent2D swapchainExtents = m_vulkanSwapchain.GetExtents();
@@ -116,18 +120,16 @@ void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearColor;
 
+	//Render pass can now begin. 
+	//SUBPASS_CONTENTS_INLINE means that no secondary cmd buffer will be executed
+	//CONTENTS_SECONDARY_COMMAND_BUFFERS mean that the render pass commands will be executed from secondary command buffers
 	vkCmdBeginRenderPass(m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+	//2nd param states if this is a graphics or compute pipeline
 	vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
-	//Create and set the viewport
-	VkViewport viewport{};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = static_cast<float>(swapchainExtents.width);
-	viewport.height = static_cast<float>(swapchainExtents.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
+	//Create and set the viewport (Area we want to render to in this cmd)
+	VkViewport viewport = m_vulkanSwapchain.GetViewport();
 	vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
 
 	//Create and set the scissor
@@ -162,8 +164,8 @@ void Application::CreateRenderPass()
 	VkAttachmentDescription colorAttachment{};
 	colorAttachment.format = m_vulkanSwapchain.GetImageFormat();
 	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; //what should we do with this data. Options load, clear, don't care
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; //store or don't care. Contents will be saved in memory for later use
 	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -171,10 +173,10 @@ void Application::CreateRenderPass()
 
 	VkAttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 0; //Directly read from the shader
-	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; //images are used as color attachment
 
 	VkSubpassDescription subpass{};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; //Explicitly declare this as a graphics pass
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachmentRef;
 
@@ -186,10 +188,15 @@ void Application::CreateRenderPass()
 	renderPassInfo.pSubpasses = &subpass;
 
 	VkSubpassDependency dependancy{};
-	dependancy.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependancy.srcSubpass = VK_SUBPASS_EXTERNAL; //implicit before and after subpasses
 	dependancy.dstSubpass = 0;
 
+	//The operations this subpass will wait on. We need to wait on the swap chain to finish reading from the image. This is accomplished by waiting on the color attachment stage
 	dependancy.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependancy.srcAccessMask = 0;
+	
+	//The operations that will wait on the above requirements are writing to the color attachment. 
+	dependancy.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependancy.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 	renderPassInfo.dependencyCount = 1;
@@ -218,9 +225,9 @@ void Application::CreateGraphicsPipeline()
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr;
+	vertexInputInfo.pVertexBindingDescriptions = nullptr; //optional
 	vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+	vertexInputInfo.pVertexAttributeDescriptions = nullptr; //optional
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -249,9 +256,9 @@ void Application::CreateGraphicsPipeline()
 
 	VkPipelineRasterizationStateCreateInfo rasterizer{};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.depthClampEnable = VK_FALSE; //useful for shadow mapping
+	rasterizer.rasterizerDiscardEnable = VK_FALSE; //geometry will never pass through raster stage
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL; //fill, line, or point
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
@@ -269,33 +276,35 @@ void Application::CreateGraphicsPipeline()
 	multisampling.alphaToCoverageEnable = VK_FALSE;
 	multisampling.alphaToOneEnable = VK_FALSE;
 
+	//configure per attached framebuffer
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; //optional
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; //optional
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; //optional
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; //optional
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; //optional
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; //optional
 
+	//global colour blending settings
 	VkPipelineColorBlendStateCreateInfo colorBlending{};
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY;
+	colorBlending.logicOp = VK_LOGIC_OP_COPY; //optional
 	colorBlending.attachmentCount = 1;
 	colorBlending.pAttachments = &colorBlendAttachment;
-	colorBlending.blendConstants[0] = 0.0f;
-	colorBlending.blendConstants[1] = 0.0f;
-	colorBlending.blendConstants[2] = 0.0f;
-	colorBlending.blendConstants[3] = 0.0f;
+	colorBlending.blendConstants[0] = 0.0f; //optional
+	colorBlending.blendConstants[1] = 0.0f; //optional
+	colorBlending.blendConstants[2] = 0.0f; //optional
+	colorBlending.blendConstants[3] = 0.0f; //optional
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 0;
-	pipelineLayoutInfo.pSetLayouts = nullptr;
-	pipelineLayoutInfo.pushConstantRangeCount = 0;
-	pipelineLayoutInfo.pPushConstantRanges = nullptr;
+	pipelineLayoutInfo.setLayoutCount = 0; //optional
+	pipelineLayoutInfo.pSetLayouts = nullptr; //optional
+	pipelineLayoutInfo.pushConstantRangeCount = 0; //optional
+	pipelineLayoutInfo.pPushConstantRanges = nullptr; //optional
 
 	if (vkCreatePipelineLayout(m_vulkanDevices.GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create Pipeline Layout!");
@@ -311,13 +320,16 @@ void Application::CreateGraphicsPipeline()
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pDepthStencilState = nullptr;
+	pipelineInfo.pDepthStencilState = nullptr; //optional
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = &dynamicState;
+
 	pipelineInfo.layout = m_pipelineLayout;
+
 	pipelineInfo.renderPass = m_renderPass;
-	pipelineInfo.subpass = 0;
-	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.subpass = 0; //what index of the sub passes should this pipeline be used
+
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; //vulkan allows you to create a base pipeline that you can then extend by setting different attributes. Switching between shared pipelines is also faster
 	pipelineInfo.basePipelineIndex = -1;
 
 	VkDevice logicalDevice = m_vulkanDevices.GetLogicalDevice();
@@ -358,7 +370,8 @@ void Application::CreateCommandBuffer()
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = m_commandPool;
-	//Specifies that this command can be submitted to a queue for execution but cannot be called from other command buffers
+	//LEVEL_SECONDARY means we cannot submit directly but can be called from primary command buffers
+	//LEVEL_PRIMARY means it can be submitted directly but cannot be called from other command buffers
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = 1;
 
@@ -374,6 +387,9 @@ void Application::CreateCommandPool()
 
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	//Either RESET_COMMAND_BUFFER_BIT or CREATE_TRANSIENT_BIT
+	//Reset bit allows for commands to be re recorded invidividually, without this whenever we change a command it would have to reset the whole pool
+	//Transient bit allows for constant modification to the commands, this can change memory allocation behaviour.
 	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; //Allows our command buffer to be rerecorded individually
 	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
 
@@ -403,16 +419,38 @@ void Application::CreateSyncObjects()
 ///////////////////////////////////////////
 void Application::DrawFrame()
 {
-	//Wait for previous frame to finish
+	/* Outline of frame
+	- Wait for previous frame to finish
+	- Acquire an image from the swap chain
+	- Record the cmd buffer
+	- Submit the recorded command buffer
+	- Present the swap cahin image
+	*/
+
+	/* Synchonrization
+	- Vulkan is designed to be fully aynchronous however for drawing a frame we have a certain order that need to ensure happens in the correct order
+	- We use Semaphores and Fences for this. 
+	   - Semaphore: Used to add order between queue operations. Queue operations refer to work we submit to a queue.
+	      - Only pauses the GPU, does not pause the CPU. 
+		  - Semaphores are provided as a signal in one function and as a wait in another. 
+	   - Fence: Used for ordering sycnhronisation on the CPU side. 
+		- Only pauses the CPU, does not pause the GPU
+
+	- Summary. Semaphores are used to keep execution in order on the GPU. Fences are used to keep the GPU and CPU in tandom
+	*/
+
+	//Wait for previous frame to finish. (Pause the CPU) 
 	VkDevice logicalDevice = m_vulkanDevices.GetLogicalDevice();
-	vkWaitForFences(logicalDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(logicalDevice, 1, &m_inFlightFence);
+	vkWaitForFences(logicalDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX); //Wait for our previous frame to finish. i.e wait for the in flight fence to be signalled
+	vkResetFences(logicalDevice, 1, &m_inFlightFence); //Fences have to be manually reset. Unsignal our fence
 
 	//acquire an image from swap chain
 	uint32_t imageIndex;
+	//Use the image available semaphore as a signal. I.e. we cannot execute any tasks that are waiting on this semaphore until it "signals" that is done
+	//UINT64_MAX: timeout for this operation, semaphore: semaphore we will signal when we have acquired the image. NULL: optional fence, we can use fence or semaphore or both
 	vkAcquireNextImageKHR(logicalDevice, m_vulkanSwapchain.GetSwapChain(), UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
-	//Record a command buffer which draws the scene
+	//Reset our cmd buffer and record it. 
 	vkResetCommandBuffer(m_commandBuffer, 0);
 	RecordCommandBuffer(m_commandBuffer, imageIndex);
 
@@ -420,35 +458,38 @@ void Application::DrawFrame()
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitSemophores[] = { m_imageAvailableSemaphore };
-	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	VkSemaphore waitSemophores[] = { m_imageAvailableSemaphore }; //Here we specify our image available semaphore as a signal we need to wait for. We do not submit the cmd buffer until we have acquired an image.
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT }; //the stage in the pipeline that we should wait on
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemophores;
 	submitInfo.pWaitDstStageMask = waitStages;
 
+	//Our command buffer(s) we want to submit for execution
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &m_commandBuffer;
 
+	//We pass in the render finished semaphore as our singal object that will be signalled once we have finished executing our cmd buffer.
 	VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphore };
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
+	//By using our fence here we now know when it is safe to re-use our command buffer
 	if (vkQueueSubmit(m_vulkanDevices.GetGraphicsQueue(), 1, &submitInfo, m_inFlightFence) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to submit draw command buffer!");
 	}
 
-
+	//Presentation stage
 	VkPresentInfoKHR presentInfo{};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = signalSemaphores;
+	presentInfo.pWaitSemaphores = signalSemaphores; //we pass our render finished semaphore here to prevent immediate execution.
 
 	VkSwapchainKHR swapChains[] = { m_vulkanSwapchain.GetSwapChain() };
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &imageIndex;
 
-	presentInfo.pResults = nullptr;
+	presentInfo.pResults = nullptr; //optional. Allows an array of VkResults to ensure that every swapchain is successful
 
 	vkQueuePresentKHR(m_vulkanDevices.GetPresentQueue(), &presentInfo);
 

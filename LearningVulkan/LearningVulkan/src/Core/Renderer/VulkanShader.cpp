@@ -12,7 +12,6 @@ void VulkanShader::InitShader(const char* filename, VkShaderStageFlagBits shader
 	createInfo.codeSize = shaderCode.size();
 	createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
 
-	VkShaderModule m_shaderModule;
 	if (vkCreateShaderModule(logicalDevice, &createInfo, nullptr, &m_shaderModule) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create shader module!");
 	}

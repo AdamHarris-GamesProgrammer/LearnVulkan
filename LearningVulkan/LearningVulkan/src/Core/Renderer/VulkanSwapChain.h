@@ -16,6 +16,7 @@ public:
 	VkSwapchainKHR GetSwapChain();
 	VkExtent2D GetExtents();
 	VkFormat GetImageFormat();
+	VkViewport GetViewport();
 	const std::vector<VkImage>& GetImages();
 	const std::vector<VkImageView>& GetImageViews();
 

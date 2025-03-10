@@ -132,6 +132,19 @@ VkFormat VulkanSwapChain::GetImageFormat()
 }
 
 ///////////////////////////////////////////
+VkViewport VulkanSwapChain::GetViewport()
+{
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(m_swapchainExtents.width);
+	viewport.height = static_cast<float>(m_swapchainExtents.height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	return viewport;
+}
+
+///////////////////////////////////////////
 const std::vector<VkImage>& VulkanSwapChain::GetImages()
 {
 	return m_swapchainImages;
