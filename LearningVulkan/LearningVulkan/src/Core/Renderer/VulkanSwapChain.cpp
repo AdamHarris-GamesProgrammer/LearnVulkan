@@ -99,6 +99,32 @@ void VulkanSwapChain::CreateImageViews(VkDevice logicalDevice)
 }
 
 ///////////////////////////////////////////
+void VulkanSwapChain::CreateFramebuffers(VkDevice logicalDevice, VkRenderPass renderPass)
+{
+	m_swapchainFramebuffers.resize(m_swapchainImageViews.size());
+
+	for (size_t i = 0; i < m_swapchainImageViews.size(); ++i) {
+		VkImageView attachment[] = {
+			m_swapchainImageViews[i]
+		};
+
+		VkExtent2D extents = GetExtents();
+		VkFramebufferCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		createInfo.renderPass = renderPass;
+		createInfo.attachmentCount = 1;
+		createInfo.pAttachments = attachment;
+		createInfo.width = extents.width;
+		createInfo.height = extents.height;
+		createInfo.layers = 1;
+
+		if (vkCreateFramebuffer(logicalDevice, &createInfo, nullptr, &m_swapchainFramebuffers[i]) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create a framebuffer!");
+		}
+	}
+}
+
+///////////////////////////////////////////
 void VulkanSwapChain::DestroyImageViews(VkDevice logicalDevice)
 {
 	for (auto imageView : m_swapchainImageViews) {
@@ -109,8 +135,15 @@ void VulkanSwapChain::DestroyImageViews(VkDevice logicalDevice)
 ///////////////////////////////////////////
 void VulkanSwapChain::DestroySwapChain(VkDevice logicalDevice)
 {
-
 	vkDestroySwapchainKHR(logicalDevice, m_swapChain, nullptr);
+}
+
+///////////////////////////////////////////
+void VulkanSwapChain::DestroyFramebuffers(VkDevice logicalDevice)
+{
+	for (auto fbs : m_swapchainFramebuffers) {
+		vkDestroyFramebuffer(logicalDevice, fbs, nullptr);
+	}
 }
 
 ///////////////////////////////////////////
@@ -154,6 +187,12 @@ const std::vector<VkImage>& VulkanSwapChain::GetImages()
 const std::vector<VkImageView>& VulkanSwapChain::GetImageViews()
 {
 	return m_swapchainImageViews;
+}
+
+///////////////////////////////////////////
+const std::vector<VkFramebuffer>& VulkanSwapChain::GetFramebuffers()
+{
+	return m_swapchainFramebuffers;
 }
 
 ///////////////////////////////////////////

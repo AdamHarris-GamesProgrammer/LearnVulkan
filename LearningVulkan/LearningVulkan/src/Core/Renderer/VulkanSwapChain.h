@@ -10,15 +10,19 @@ class VulkanSwapChain {
 public:
 	void InitSwapChain(GLFWwindow* pWindow, VulkanDevice* pDevices, VkSurfaceKHR surface);
 	void CreateImageViews(VkDevice logicalDevice);
+	void CreateFramebuffers(VkDevice logicalDevice, VkRenderPass renderPass);
 	void DestroyImageViews(VkDevice logicalDevice);
 	void DestroySwapChain(VkDevice logicalDevice);
+	void DestroyFramebuffers(VkDevice logicalDevice);
 
 	VkSwapchainKHR GetSwapChain();
 	VkExtent2D GetExtents();
 	VkFormat GetImageFormat();
 	VkViewport GetViewport();
+
 	const std::vector<VkImage>& GetImages();
 	const std::vector<VkImageView>& GetImageViews();
+	const std::vector<VkFramebuffer>& GetFramebuffers();
 
 private:
 	VkSurfaceFormatKHR ChooseSwapChainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
@@ -31,5 +35,6 @@ private:
 	VkFormat m_swapchainImageFormat;
 	std::vector<VkImage> m_swapchainImages;
 	std::vector<VkImageView> m_swapchainImageViews;
+	std::vector<VkFramebuffer> m_swapchainFramebuffers;
 
 };

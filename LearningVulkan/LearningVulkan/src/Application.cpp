@@ -34,7 +34,7 @@ void Application::Init(const int width, const int height, const char* appName)
 	m_vulkanVertexShader.InitShader("shaders/vert.spv", VK_SHADER_STAGE_VERTEX_BIT, m_vulkanDevices.GetLogicalDevice());
 	m_vulkanFragmentShader.InitShader("shaders/frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, m_vulkanDevices.GetLogicalDevice());
 	CreateGraphicsPipeline();
-	CreateFramebuffers();
+	m_vulkanSwapchain.CreateFramebuffers(m_vulkanDevices.GetLogicalDevice(), m_renderPass);
 	CreateCommandPool();
 	CreateCommandBuffers(); //auto-destroyed when the pool is, we do not need to explicitely destroy the command buffers
 	CreateSyncObjects();
@@ -58,10 +58,7 @@ void Application::Cleanup()
 	m_vulkanInstance.DestroyDebugMessenger();
 
 	VkDevice logicalDevice = m_vulkanDevices.GetLogicalDevice();
-	for (auto fbs : m_swapchainFramebuffers) {
-		vkDestroyFramebuffer(logicalDevice, fbs, nullptr);
-	}
-
+	m_vulkanSwapchain.DestroyFramebuffers(logicalDevice);
 	m_vulkanSwapchain.DestroyImageViews(logicalDevice);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
@@ -111,7 +108,7 @@ void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
 
 	//Define what attachements to bind
 	renderPassInfo.renderPass = m_renderPass;
-	renderPassInfo.framebuffer = m_swapchainFramebuffers[imageIndex];
+	renderPassInfo.framebuffer = m_vulkanSwapchain.GetFramebuffers()[imageIndex];
 	//We need to bind the framebuffer for the swapchain that we want to draw to. 
 
 	//Define the size of the render pass area
@@ -339,32 +336,6 @@ void Application::CreateGraphicsPipeline()
 	VkDevice logicalDevice = m_vulkanDevices.GetLogicalDevice();
 	if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create graphics pipeline!");
-	}
-}
-
-///////////////////////////////////////////
-void Application::CreateFramebuffers()
-{
-	m_swapchainFramebuffers.resize(m_vulkanSwapchain.GetImageViews().size());
-
-	for (size_t i = 0; i < m_vulkanSwapchain.GetImageViews().size(); ++i) {
-		VkImageView attachment[] = {
-			m_vulkanSwapchain.GetImageViews()[i]
-		};
-
-		VkExtent2D extents = m_vulkanSwapchain.GetExtents();
-		VkFramebufferCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		createInfo.renderPass = m_renderPass;
-		createInfo.attachmentCount = 1;
-		createInfo.pAttachments = attachment;
-		createInfo.width = extents.width;
-		createInfo.height = extents.height;
-		createInfo.layers = 1;
-
-		if (vkCreateFramebuffer(m_vulkanDevices.GetLogicalDevice(), &createInfo, nullptr, &m_swapchainFramebuffers[i]) != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create a framebuffer!");
-		}
 	}
 }
 

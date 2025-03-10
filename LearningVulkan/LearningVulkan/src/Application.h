@@ -62,8 +62,6 @@ private:
 
 	uint32_t m_currentFrame = 0;
 
-	std::vector<VkFramebuffer> m_swapchainFramebuffers;
-
 	//Manages the memory that is used to store the buffers and command buffers allocated from them
 	VkCommandPool m_commandPool;
 	std::vector<VkCommandBuffer> m_commandBuffers;
