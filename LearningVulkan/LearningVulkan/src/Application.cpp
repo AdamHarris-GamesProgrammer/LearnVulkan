@@ -1,6 +1,8 @@
 #include "Application.h"
+#include "Core/Logger.h"
 
 #include "Core/Renderer/VulkanValidationLayer.h"
+
 
 #include <iostream>
 #include <fstream>
@@ -17,6 +19,8 @@ void Application::Init(const int width, const int height, const char* appName)
 	m_screenHeight = height;
 	m_pApplicationName = appName;
 
+	InitializeLogger();
+	
 	//Initialize GLFW and our window
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); //Do not create a OpenGL context (Not needed for Vulkan)
@@ -87,6 +91,8 @@ void Application::Cleanup()
 	//Cleanup GLFW
 	glfwDestroyWindow(m_pWindow);
 	glfwTerminate();
+
+	ShutdownLogger();
 }
 
 ///////////////////////////////////////////

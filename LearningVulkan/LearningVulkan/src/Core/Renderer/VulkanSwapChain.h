@@ -11,6 +11,7 @@ public:
 	void InitSwapChain(GLFWwindow* pWindow, VulkanDevice* pDevices, VkSurfaceKHR surface);
 	void CreateImageViews(VkDevice logicalDevice);
 	void CreateFramebuffers(VkDevice logicalDevice, VkRenderPass renderPass);
+
 	void DestroyImageViews(VkDevice logicalDevice);
 	void DestroySwapChain(VkDevice logicalDevice);
 	void DestroyFramebuffers(VkDevice logicalDevice);
