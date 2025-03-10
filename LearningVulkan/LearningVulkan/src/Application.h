@@ -28,7 +28,7 @@ private:
 	void CreateRenderPass();
 	void CreateGraphicsPipeline();
 	void CreateFramebuffers();
-	void CreateCommandBuffer();
+	void CreateCommandBuffers();
 	void CreateCommandPool();
 	void CreateSyncObjects();
 
@@ -60,15 +60,17 @@ private:
 
 	VkSurfaceKHR m_surface;
 
+	uint32_t m_currentFrame = 0;
+
 	std::vector<VkFramebuffer> m_swapchainFramebuffers;
 
 	//Manages the memory that is used to store the buffers and command buffers allocated from them
 	VkCommandPool m_commandPool;
-	VkCommandBuffer m_commandBuffer;
+	std::vector<VkCommandBuffer> m_commandBuffers;
 
-	VkSemaphore m_imageAvailableSemaphore;
-	VkSemaphore m_renderFinishedSemaphore;
-	VkFence m_inFlightFence;
+	std::vector<VkSemaphore> m_imageAvailableSemaphores;
+	std::vector<VkSemaphore> m_renderFinishedSemaphores;
+	std::vector<VkFence> m_inFlightFences;
 	//~Vulkan
 };
 

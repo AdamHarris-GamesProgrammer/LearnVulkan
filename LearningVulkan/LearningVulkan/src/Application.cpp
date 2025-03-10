@@ -8,6 +8,8 @@
 #include <set>
 #include <algorithm>
 
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 ///////////////////////////////////////////
 void Application::Init(const int width, const int height, const char* appName)
 {
@@ -34,7 +36,7 @@ void Application::Init(const int width, const int height, const char* appName)
 	CreateGraphicsPipeline();
 	CreateFramebuffers();
 	CreateCommandPool();
-	CreateCommandBuffer(); //auto-destroyed when the pool is, we do not need to explicitely destroy the command buffers
+	CreateCommandBuffers(); //auto-destroyed when the pool is, we do not need to explicitely destroy the command buffers
 	CreateSyncObjects();
 }
 
@@ -62,9 +64,11 @@ void Application::Cleanup()
 
 	m_vulkanSwapchain.DestroyImageViews(logicalDevice);
 
-	vkDestroySemaphore(logicalDevice, m_imageAvailableSemaphore, nullptr);
-	vkDestroySemaphore(logicalDevice, m_renderFinishedSemaphore, nullptr);
-	vkDestroyFence(logicalDevice, m_inFlightFence, nullptr);
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+		vkDestroySemaphore(logicalDevice, m_imageAvailableSemaphores[i], nullptr);
+		vkDestroySemaphore(logicalDevice, m_renderFinishedSemaphores[i], nullptr);
+		vkDestroyFence(logicalDevice, m_inFlightFences[i], nullptr);
+	}
 
 	vkDestroyPipeline(logicalDevice, m_graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(logicalDevice, m_pipelineLayout, nullptr);
@@ -98,7 +102,7 @@ void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
 	beginInfo.pInheritanceInfo = nullptr; //optional (only relevent for secondary buffers)
 
 	//Begin our recording
-	if (vkBeginCommandBuffer(m_commandBuffer, &beginInfo) != VK_SUCCESS) {
+	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to Record Command Buffer");
 	}
 
@@ -123,29 +127,29 @@ void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
 	//Render pass can now begin. 
 	//SUBPASS_CONTENTS_INLINE means that no secondary cmd buffer will be executed
 	//CONTENTS_SECONDARY_COMMAND_BUFFERS mean that the render pass commands will be executed from secondary command buffers
-	vkCmdBeginRenderPass(m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	//2nd param states if this is a graphics or compute pipeline
-	vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
 	//Create and set the viewport (Area we want to render to in this cmd)
 	VkViewport viewport = m_vulkanSwapchain.GetViewport();
-	vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
 	//Create and set the scissor
 	VkRect2D scissor{};
 	scissor.offset = { 0,0 };
 	scissor.extent = swapchainExtents;
-	vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
 	//command buffer, vertex count, instance count, first vertex, first instance
-	vkCmdDraw(m_commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
 	//Finish our render pass
-	vkCmdEndRenderPass(m_commandBuffer);
+	vkCmdEndRenderPass(commandBuffer);
 
 	//End the command buffer and check for success
-	if (vkEndCommandBuffer(m_commandBuffer) != VK_SUCCESS) {
+	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to record command buffer!");
 	}
 }
@@ -365,17 +369,19 @@ void Application::CreateFramebuffers()
 }
 
 ///////////////////////////////////////////
-void Application::CreateCommandBuffer()
+void Application::CreateCommandBuffers()
 {
+	m_commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = m_commandPool;
 	//LEVEL_SECONDARY means we cannot submit directly but can be called from primary command buffers
 	//LEVEL_PRIMARY means it can be submitted directly but cannot be called from other command buffers
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = 1;
+	allocInfo.commandBufferCount = (uint32_t) m_commandBuffers.size();
 
-	if (vkAllocateCommandBuffers(m_vulkanDevices.GetLogicalDevice(), &allocInfo, &m_commandBuffer) != VK_SUCCESS) {
+	if (vkAllocateCommandBuffers(m_vulkanDevices.GetLogicalDevice(), &allocInfo, m_commandBuffers.data()) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to Allocate Command Buffer");
 	}
 }
@@ -401,6 +407,10 @@ void Application::CreateCommandPool()
 ///////////////////////////////////////////
 void Application::CreateSyncObjects()
 {
+	m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+	m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+	m_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -409,10 +419,12 @@ void Application::CreateSyncObjects()
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; //Creates the fence in a already signaled state
 
 	VkDevice logicalDevice = m_vulkanDevices.GetLogicalDevice();
-	if (vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &m_imageAvailableSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphore) != VK_SUCCESS ||
-		vkCreateFence(logicalDevice, &fenceInfo, nullptr, &m_inFlightFence) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create Sychronisation objects!");
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+		if (vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
+			vkCreateFence(logicalDevice, &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create Sychronisation objects!");
+		}
 	}
 }
 
@@ -441,24 +453,24 @@ void Application::DrawFrame()
 
 	//Wait for previous frame to finish. (Pause the CPU) 
 	VkDevice logicalDevice = m_vulkanDevices.GetLogicalDevice();
-	vkWaitForFences(logicalDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX); //Wait for our previous frame to finish. i.e wait for the in flight fence to be signalled
-	vkResetFences(logicalDevice, 1, &m_inFlightFence); //Fences have to be manually reset. Unsignal our fence
+	vkWaitForFences(logicalDevice, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX); //Wait for our previous frame to finish. i.e wait for the in flight fence to be signalled
+	vkResetFences(logicalDevice, 1, &m_inFlightFences[m_currentFrame]); //Fences have to be manually reset. Unsignal our fence
 
 	//acquire an image from swap chain
 	uint32_t imageIndex;
 	//Use the image available semaphore as a signal. I.e. we cannot execute any tasks that are waiting on this semaphore until it "signals" that is done
 	//UINT64_MAX: timeout for this operation, semaphore: semaphore we will signal when we have acquired the image. NULL: optional fence, we can use fence or semaphore or both
-	vkAcquireNextImageKHR(logicalDevice, m_vulkanSwapchain.GetSwapChain(), UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+	vkAcquireNextImageKHR(logicalDevice, m_vulkanSwapchain.GetSwapChain(), UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
 
 	//Reset our cmd buffer and record it. 
-	vkResetCommandBuffer(m_commandBuffer, 0);
-	RecordCommandBuffer(m_commandBuffer, imageIndex);
+	vkResetCommandBuffer(m_commandBuffers[m_currentFrame], 0);
+	RecordCommandBuffer(m_commandBuffers[m_currentFrame], imageIndex);
 
 	//Submit the recorded command buffer
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitSemophores[] = { m_imageAvailableSemaphore }; //Here we specify our image available semaphore as a signal we need to wait for. We do not submit the cmd buffer until we have acquired an image.
+	VkSemaphore waitSemophores[] = { m_imageAvailableSemaphores[m_currentFrame] }; //Here we specify our image available semaphore as a signal we need to wait for. We do not submit the cmd buffer until we have acquired an image.
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT }; //the stage in the pipeline that we should wait on
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemophores;
@@ -466,15 +478,15 @@ void Application::DrawFrame()
 
 	//Our command buffer(s) we want to submit for execution
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &m_commandBuffer;
+	submitInfo.pCommandBuffers = &m_commandBuffers[m_currentFrame];
 
 	//We pass in the render finished semaphore as our singal object that will be signalled once we have finished executing our cmd buffer.
-	VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphore };
+	VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphores[m_currentFrame] };
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
 	//By using our fence here we now know when it is safe to re-use our command buffer
-	if (vkQueueSubmit(m_vulkanDevices.GetGraphicsQueue(), 1, &submitInfo, m_inFlightFence) != VK_SUCCESS) {
+	if (vkQueueSubmit(m_vulkanDevices.GetGraphicsQueue(), 1, &submitInfo, m_inFlightFences[m_currentFrame]) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to submit draw command buffer!");
 	}
 
@@ -493,6 +505,5 @@ void Application::DrawFrame()
 
 	vkQueuePresentKHR(m_vulkanDevices.GetPresentQueue(), &presentInfo);
 
-
-	//Present the swap chain image
+	m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
